@@ -1,0 +1,1 @@
+ALTER TABLE "participations" ADD COLUMN "questionnaire_version" integer DEFAULT 1 NOT NULL;

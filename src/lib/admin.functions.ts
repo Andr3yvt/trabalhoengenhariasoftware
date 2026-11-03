@@ -1,7 +1,7 @@
 import { createMiddleware, createServerFn } from '@tanstack/react-start'
 import { getUser } from '@netlify/identity'
 import { and, desc, gte, ilike, lt } from 'drizzle-orm'
-import { QUESTIONS } from './questions'
+import { LEGACY_QUESTIONS_V1, QUESTIONS } from './questions'
 
 const ADMIN_ROLE = 'admin'
 
@@ -73,6 +73,7 @@ export const listParticipations = createServerFn({ method: 'GET' })
       status: r.status,
       createdAt: r.createdAt.toISOString(),
       answers: r.answers,
+      version: r.questionnaireVersion,
     }))
   })
 
@@ -87,11 +88,38 @@ export const exportParticipationsCsv = createServerFn({ method: 'POST' })
   .validator(validateFilters)
   .handler(async ({ data }) => {
     const rows = await queryParticipations(data)
-    const header = ['id', 'data_envio', 'nome_ou_apelido', 'status', ...QUESTIONS.map((q) => `P${q.number} - ${q.title}`)]
+    // Current 25 questions first (P1…P25). Rows from the original 15-question version use their own
+    // columns, added only when such rows are part of the export, so answers never land under the wrong title.
+    const hasLegacy = rows.some((r) => r.questionnaireVersion === 1)
+    const legacy = hasLegacy ? LEGACY_QUESTIONS_V1 : []
+    const header = [
+      'id',
+      'data_envio',
+      'nome_ou_apelido',
+      'status',
+      'versao_questionario',
+      'respondidas',
+      'nao_respondidas',
+      ...QUESTIONS.map((q) => `P${q.number} - ${q.title}`),
+      ...legacy.map((q) => `[v1] P${q.number} - ${q.title}`),
+    ]
     const lines = [header.map(csvCell).join(',')]
     for (const r of rows) {
+      const isLegacy = r.questionnaireVersion === 1
+      const set = isLegacy ? LEGACY_QUESTIONS_V1 : QUESTIONS
+      const missing = set.filter((q) => !r.answers[q.id]?.trim()).map((q) => `P${q.number}`)
       lines.push(
-        [r.id, r.createdAt.toISOString(), r.nickname ?? '', r.status, ...QUESTIONS.map((q) => r.answers[q.id] ?? '')]
+        [
+          r.id,
+          r.createdAt.toISOString(),
+          r.nickname ?? '',
+          r.status,
+          String(r.questionnaireVersion),
+          `${set.length - missing.length}/${set.length}`,
+          missing.join(' '),
+          ...QUESTIONS.map((q) => (isLegacy ? '' : (r.answers[q.id] ?? ''))),
+          ...legacy.map((q) => (isLegacy ? (r.answers[q.id] ?? '') : '')),
+        ]
           .map(csvCell)
           .join(','),
       )
