@@ -19,7 +19,8 @@ type Step =
 
 type Draft = { nickname: string; consent: boolean; answers: Answers; step: Step }
 
-const DRAFT_KEY = 'andrey-project:rascunho'
+// Versioned key: drafts from the old 15-question flow are never restored into the 25-question one.
+const DRAFT_KEY = 'andrey-project:rascunho:v2'
 const TOTAL = QUESTIONS.length
 
 function isAnswered(q: Question, answers: Answers) {
@@ -151,7 +152,8 @@ function Welcome({ stepKey, onStart }: { stepKey: string; onStart: () => void })
   const ref = useFocusHeading(stepKey)
   return (
     <section aria-labelledby="titulo-abertura" className="animate-rise text-center">
-      <p className="mx-auto mb-6 inline-flex items-center gap-2 rounded-full border border-navy/15 bg-white px-4 py-1.5 text-sm font-medium text-navy shadow-soft">
+      <p className="text-sm font-bold uppercase tracking-[0.28em] text-navy">Andrey Project</p>
+      <p className="mx-auto mt-5 mb-6 inline-flex items-center gap-2 rounded-full border border-navy/15 bg-white px-4 py-1.5 text-sm font-medium text-navy shadow-soft">
         <span aria-hidden="true" className="h-2 w-2 rounded-full bg-navy" />
         Projeto acadêmico de acessibilidade digital
       </p>
@@ -163,11 +165,15 @@ function Welcome({ stepKey, onStart }: { stepKey: string; onStart: () => void })
       >
         Acessibilidade para Todos
       </h1>
+      <p className="mx-auto mt-4 max-w-xl text-lg font-medium italic text-navy/85 sm:text-xl">
+        “Sua opinião pode tornar a internet mais acessível.”
+      </p>
       <p className="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-ink sm:text-xl">
         Um projeto que busca tornar a experiência digital mais acessível, simples e agradável para todos.
       </p>
-      <p className="mx-auto mt-4 max-w-xl text-base leading-relaxed text-muted">
-        Sua participação leva aproximadamente 5 minutos e pode ajudar a identificar melhorias importantes.
+      <p className="mx-auto mt-4 max-w-2xl text-base leading-relaxed text-muted sm:text-lg">
+        Sua participação é muito importante. Por meio das suas respostas, podemos identificar dificuldades, avaliar
+        funcionalidades e encontrar oportunidades de melhoria.
       </p>
       <div className="mt-10">
         <button type="button" className="btn-primary px-8 text-lg" onClick={onStart}>
@@ -178,17 +184,51 @@ function Welcome({ stepKey, onStart }: { stepKey: string; onStart: () => void })
 
       <ul className="mx-auto mt-14 grid max-w-2xl gap-4 text-left sm:grid-cols-3" aria-label="Sobre a avaliação">
         {[
-          { t: '≈ 5 minutos', d: 'Sem pressa e sem limite de tempo.' },
-          { t: '15 perguntas', d: 'Uma por tela, com progresso visível.' },
-          { t: 'Respostas privadas', d: 'Visíveis apenas ao responsável.' },
+          { icon: 'clock', t: 'Tempo estimado', v: '6 a 8 minutos', d: 'Sem pressa e sem limite de tempo.' },
+          { icon: 'list', t: 'Quantidade', v: `${TOTAL} perguntas`, d: 'Uma por tela, com progresso visível.' },
+          { icon: 'heart', t: 'Participação', v: 'Voluntária', d: 'Perguntas pessoais são opcionais.' },
         ].map((item) => (
           <li key={item.t} className="rounded-2xl border border-line/80 bg-white p-5 shadow-soft">
-            <p className="font-semibold text-navy">{item.t}</p>
+            <span aria-hidden="true" className="flex h-10 w-10 items-center justify-center rounded-xl bg-sky text-navy">
+              <InfoIcon name={item.icon} />
+            </span>
+            <p className="mt-3 text-sm font-medium text-muted">{item.t}</p>
+            <p className="font-semibold text-navy">{item.v}</p>
             <p className="mt-1 text-sm leading-relaxed text-muted">{item.d}</p>
           </li>
         ))}
       </ul>
     </section>
+  )
+}
+
+function InfoIcon({ name }: { name: string }) {
+  const common = {
+    viewBox: '0 0 24 24',
+    className: 'h-5 w-5',
+    fill: 'none',
+    stroke: 'currentColor',
+    strokeWidth: 2,
+    strokeLinecap: 'round' as const,
+    strokeLinejoin: 'round' as const,
+  }
+  if (name === 'clock')
+    return (
+      <svg {...common}>
+        <circle cx="12" cy="12" r="9" />
+        <path d="M12 7v5l3 2" />
+      </svg>
+    )
+  if (name === 'list')
+    return (
+      <svg {...common}>
+        <path d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01" />
+      </svg>
+    )
+  return (
+    <svg {...common}>
+      <path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10Z" />
+    </svg>
   )
 }
 
@@ -229,8 +269,7 @@ function Identify(props: {
           Antes de começar
         </h1>
         <p className="mt-4 text-lg leading-relaxed">
-          Para organizar os resultados do teste, você pode informar como gostaria de ser identificada. Essa
-          informação é opcional.
+          Para organizar os resultados desta avaliação, você pode informar como gostaria de ser identificada.
         </p>
 
         <div className="mt-8">
@@ -252,9 +291,8 @@ function Identify(props: {
 
         <div className="mt-8 rounded-2xl bg-sky p-5 sm:p-6">
           <p className="text-base leading-relaxed">
-            Ao participar, você concorda que suas respostas sejam utilizadas para avaliar este projeto. As perguntas
-            pessoais são opcionais. As respostas serão armazenadas de forma privada e poderão ser consultadas pelo
-            responsável pelo projeto.
+            Suas respostas serão utilizadas para avaliar e aprimorar este projeto. As respostas pessoais são opcionais
+            e serão armazenadas em uma área privada, acessível somente ao responsável autorizado pelo projeto.
           </p>
           <label className="mt-5 flex cursor-pointer items-start gap-3">
             <input
@@ -376,6 +414,9 @@ function QuestionScreen(props: {
         className="rounded-3xl border border-line/80 bg-white p-6 shadow-soft sm:p-10"
       >
         <div className="flex flex-wrap items-center gap-2">
+          <span className="rounded-full bg-navy/5 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-navy ring-1 ring-navy/15">
+            Pergunta {String(q.number).padStart(2, '0')}
+          </span>
           <span className="rounded-full bg-sky px-3 py-1 text-xs font-semibold uppercase tracking-wide text-navy">
             {CATEGORY_LABEL[q.category]}
           </span>
@@ -562,7 +603,7 @@ function Review(props: {
         Quase tudo pronto!
       </h1>
       <p className="mt-3 text-lg leading-relaxed">
-        Confira suas respostas antes de finalizar. Você ainda pode voltar e alterar qualquer resposta.
+        Antes de finalizar, você pode conferir suas respostas e alterar qualquer informação, caso deseje.
       </p>
 
       <div className="mt-8 flex items-center justify-between gap-4 rounded-2xl border border-line/80 bg-sky px-5 py-4">
@@ -600,7 +641,8 @@ function Review(props: {
               <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0">
                   <p className="text-sm font-semibold text-muted">
-                    Pergunta {q.number} · {q.required ? 'Obrigatória' : 'Opcional'}
+                    Pergunta {String(q.number).padStart(2, '0')} · {CATEGORY_LABEL[q.category]} ·{' '}
+                    {q.required ? 'Obrigatória' : 'Opcional'}
                   </p>
                   <p className="mt-1 font-semibold leading-snug text-navy">{q.title}</p>
                   <p className={`mt-2 whitespace-pre-wrap break-words leading-relaxed ${answer ? 'text-ink' : 'italic text-muted'}`}>
@@ -655,6 +697,9 @@ function Review(props: {
 
 /* ------------------------------------------------------------------ */
 
+const WHATSAPP_DISPLAY = '45 98842-8151'
+const WHATSAPP_URL = 'https://wa.me/5545988428151'
+
 function Thanks({ stepKey, onFinish }: { stepKey: string; onFinish: () => void }) {
   const ref = useFocusHeading(stepKey)
   return (
@@ -669,17 +714,56 @@ function Thanks({ stepKey, onFinish }: { stepKey: string; onFinish: () => void }
           Obrigado por participar!
         </h1>
         <p className="mx-auto mt-4 max-w-xl text-lg leading-relaxed text-ink">
-          Sua opinião é muito importante para melhorar este projeto. Obrigado por dedicar alguns minutos para testar o
-          site e compartilhar suas respostas.
+          Sua participação foi muito importante para este projeto. Cada resposta contribui para identificar
+          oportunidades de melhoria e tornar a experiência digital mais acessível, inclusiva e agradável.
         </p>
-        <p className="mx-auto mt-4 max-w-xl text-base italic leading-relaxed text-mint-ink">
-          Espero que sua experiência tenha sido tão agradável quanto foi receber suas respostas.
+        <p className="mx-auto mt-4 max-w-xl text-base leading-relaxed text-mint-ink">
+          Esperamos que sua experiência tenha sido agradável. Agradecemos por dedicar alguns minutos para conhecer e
+          avaliar o Andrey Project.
         </p>
         <p role="status" className="sr-only">
           Respostas enviadas com sucesso.
         </p>
-        <button type="button" className="btn-primary mt-8" onClick={onFinish}>
-          Finalizar
+      </div>
+
+      <section
+        aria-labelledby="titulo-contato"
+        className="mt-8 rounded-3xl border border-line/80 bg-white p-6 shadow-soft sm:p-10"
+      >
+        <h2 id="titulo-contato" className="text-2xl font-bold tracking-tight text-navy">
+          Gostaria de compartilhar mais alguma opinião?
+        </h2>
+        <p className="mt-3 text-base leading-relaxed text-ink sm:text-lg">
+          Caso tenha alguma sugestão, comentário ou queira conversar um pouco mais sobre o projeto, deixo abaixo meu
+          contato. Será um prazer receber seu feedback e trocar algumas ideias.
+        </p>
+
+        <div className="mt-6 flex flex-col gap-5 rounded-2xl bg-sky p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
+          <div className="flex items-center gap-4">
+            <span aria-hidden="true" className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-white text-navy shadow-soft">
+              <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 11.5a8.5 8.5 0 0 1-12.6 7.4L3 20.5l1.6-5.2A8.5 8.5 0 1 1 21 11.5Z" />
+              </svg>
+            </span>
+            <div>
+              <h3 className="text-sm font-semibold text-muted">Contato do responsável pelo projeto</h3>
+              <p className="mt-0.5 text-lg font-bold text-navy">
+                <span className="font-medium text-muted">WhatsApp: </span>
+                {WHATSAPP_DISPLAY}
+              </p>
+            </div>
+          </div>
+          <a href={WHATSAPP_URL} target="_blank" rel="noopener noreferrer" className="btn-primary shrink-0">
+            Conversar pelo WhatsApp
+            <span className="sr-only"> (abre em uma nova aba)</span>
+            <span aria-hidden="true">↗</span>
+          </a>
+        </div>
+      </section>
+
+      <div className="mt-8 text-center">
+        <button type="button" className="btn-secondary" onClick={onFinish}>
+          Voltar ao início
         </button>
       </div>
     </section>

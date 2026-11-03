@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { exportParticipationsCsv, listParticipations } from '@/lib/admin.functions'
-import { CATEGORY_LABEL, QUESTIONS } from '@/lib/questions'
+import { CATEGORY_LABEL, questionsForVersion } from '@/lib/questions'
 
 type Row = Awaited<ReturnType<typeof listParticipations>>[number]
 type Filters = { from: string; to: string; search: string }
@@ -17,8 +17,16 @@ function formatDate(iso: string) {
   return dateFmt.format(new Date(iso))
 }
 
+function questionsOf(row: Row) {
+  return questionsForVersion(row.version)
+}
+
+function missingOf(row: Row) {
+  return questionsOf(row).filter((q) => !row.answers[q.id]?.trim())
+}
+
 function answeredCount(row: Row) {
-  return QUESTIONS.filter((q) => row.answers[q.id]?.trim()).length
+  return questionsOf(row).length - missingOf(row).length
 }
 
 export default function AdminDashboard() {
@@ -70,7 +78,7 @@ export default function AdminDashboard() {
 
   const total = rows?.length ?? 0
   const withName = rows?.filter((r) => r.nickname).length ?? 0
-  const positive = rows?.filter((r) => ['Muito boa.', 'Boa.'].includes(r.answers.q14)).length ?? 0
+  const complete = rows?.filter((r) => missingOf(r).length === 0).length ?? 0
   const filtersActive = Boolean(applied.from || applied.to || applied.search)
 
   return (
@@ -88,10 +96,7 @@ export default function AdminDashboard() {
       <dl className="mt-8 grid gap-4 sm:grid-cols-3">
         <Stat label={filtersActive ? 'Participações (filtradas)' : 'Participações'} value={String(total)} />
         <Stat label="Com nome ou apelido" value={String(withName)} />
-        <Stat
-          label="Experiência boa ou muito boa"
-          value={total ? `${Math.round((positive / total) * 100)}%` : '—'}
-        />
+        <Stat label="Com todas as perguntas respondidas" value={String(complete)} />
       </dl>
 
       <form
@@ -179,7 +184,7 @@ export default function AdminDashboard() {
                 <tr>
                   <th scope="col" className="px-5 py-3 font-semibold">Data</th>
                   <th scope="col" className="px-5 py-3 font-semibold">Nome ou apelido</th>
-                  <th scope="col" className="px-5 py-3 font-semibold">Avaliação geral</th>
+                  <th scope="col" className="px-5 py-3 font-semibold">Questionário</th>
                   <th scope="col" className="px-5 py-3 font-semibold">Respondidas</th>
                   <th scope="col" className="px-5 py-3 font-semibold">Status</th>
                   <th scope="col" className="px-5 py-3"><span className="sr-only">Ações</span></th>
@@ -192,8 +197,15 @@ export default function AdminDashboard() {
                     <td className="px-5 py-3.5 font-medium text-navy">
                       {r.nickname || <span className="italic font-normal text-muted">Não informado</span>}
                     </td>
-                    <td className="px-5 py-3.5">{r.answers.q14 ?? '—'}</td>
-                    <td className="px-5 py-3.5">{answeredCount(r)} / {QUESTIONS.length}</td>
+                    <td className="px-5 py-3.5 text-sm">
+                      {r.version === 1 ? 'Versão anterior (15)' : `Atual (${questionsOf(r).length})`}
+                    </td>
+                    <td className="px-5 py-3.5">
+                      {answeredCount(r)} / {questionsOf(r).length}
+                      {missingOf(r).length > 0 && (
+                        <span className="ml-1 text-sm text-muted">({missingOf(r).length} sem resposta)</span>
+                      )}
+                    </td>
                     <td className="px-5 py-3.5">
                       <span className="inline-flex items-center gap-1 rounded-full bg-mint px-2.5 py-0.5 text-xs font-semibold text-mint-ink">
                         <span aria-hidden="true">✓</span> {r.status === 'concluido' ? 'Concluído' : r.status}
@@ -255,8 +267,14 @@ function DetailDialog({ row, onClose }: { row: Row | null; onClose: () => void }
                 {row.nickname || 'Participante sem nome'}
               </h2>
               <p className="mt-1 text-sm text-muted">
-                Enviado em {formatDate(row.createdAt)} · {answeredCount(row)} de {QUESTIONS.length} respondidas
+                Enviado em {formatDate(row.createdAt)} · {answeredCount(row)} de {questionsOf(row).length} respondidas
+                {row.version === 1 && ' · versão anterior do questionário (15 perguntas)'}
               </p>
+              {missingOf(row).length > 0 && (
+                <p className="mt-1 text-sm font-medium text-navy">
+                  Não respondidas: {missingOf(row).map((q) => q.number).join(', ')}
+                </p>
+              )}
               <p className="mt-0.5 break-all text-xs text-muted">ID: {row.id}</p>
             </div>
             <button type="button" onClick={onClose} className="btn-secondary px-4 py-2 text-sm">
@@ -264,17 +282,24 @@ function DetailDialog({ row, onClose }: { row: Row | null; onClose: () => void }
             </button>
           </div>
           <ol className="grid gap-4 p-6">
-            {QUESTIONS.map((q) => {
+            {questionsOf(row).map((q) => {
               const answer = row.answers[q.id]?.trim()
               return (
-                <li key={q.id} className="rounded-2xl bg-mist p-4">
+                <li
+                  key={q.id}
+                  className={`rounded-2xl p-4 ${answer ? 'bg-mist' : 'border-2 border-dashed border-line bg-white'}`}
+                >
                   <p className="text-xs font-semibold uppercase tracking-wide text-muted">
-                    Pergunta {q.number} · {CATEGORY_LABEL[q.category]} ·{' '}
+                    Pergunta {String(q.number).padStart(2, '0')} · {CATEGORY_LABEL[q.category]} ·{' '}
                     {q.type === 'choice' ? 'Múltipla escolha' : 'Aberta'}
                   </p>
                   <p className="mt-1 font-semibold leading-snug text-navy">{q.title}</p>
                   <p className={`mt-2 whitespace-pre-wrap break-words leading-relaxed ${answer ? '' : 'italic text-muted'}`}>
-                    {answer || 'Sem resposta'}
+                    {answer || (
+                      <>
+                        <span aria-hidden="true">○ </span>Não respondida
+                      </>
+                    )}
                   </p>
                 </li>
               )
